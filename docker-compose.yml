@@ -3,7 +3,7 @@ version: '3.8'
 services:
   vox-server:
     build:
-      context: ./server
+      context: .
       dockerfile: Dockerfile
     container_name: vox-server
     restart: unless-stopped
