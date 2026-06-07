@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  vox-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: vox-server
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      # Назва моделі для розпізнавання.
+      - WHISPER_MODEL=Systran/faster-whisper-small
+
+      # Квантизація ваг моделі.
+      - COMPUTE_TYPE=int8
+      - WHISPER_DEVICE=cpu
+      - FINAL_BEAM=5
+      - FINAL_BEST_OF=1
+      - FINAL_PATIENCE=2.5
+      - FINAL_TEMPERATURE=0.0
+      - FINAL_REPETITION_PENALTY=1.2
+      - FINAL_NO_SPEECH_THRESHOLD=0.5
+      - FINAL_CONDITION_ON_PREVIOUS_TEXT=true
+      
+      # Збільшуємо кількість потоків для прискорення розпізнавання.
+      - CPU_THREADS=4
+      
+    volumes:
+      - ./models:/app/models
+      
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 2G
