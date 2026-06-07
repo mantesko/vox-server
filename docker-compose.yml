@@ -9,11 +9,11 @@ services:
     restart: unless-stopped
     ports:
       - "8002:8002"
+    network_mode: bridge
+    security_opt:
+      - apparmor:unconfined
     environment:
-      # Назва моделі для розпізнавання.
       - WHISPER_MODEL=Systran/faster-whisper-small
-
-      # Квантизація ваг моделі.
       - COMPUTE_TYPE=int8
       - WHISPER_DEVICE=cpu
       - FINAL_BEAM=5
@@ -23,13 +23,9 @@ services:
       - FINAL_REPETITION_PENALTY=1.2
       - FINAL_NO_SPEECH_THRESHOLD=0.5
       - FINAL_CONDITION_ON_PREVIOUS_TEXT=true
-      
-      # Збільшуємо кількість потоків для прискорення розпізнавання.
       - CPU_THREADS=4
-      
     volumes:
       - ./models:/app/models
-      
     deploy:
       resources:
         limits:
