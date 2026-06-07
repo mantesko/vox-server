@@ -13,6 +13,8 @@ MODEL_NAME = os.getenv("WHISPER_MODEL", "small")
 COMPUTE_TYPE = os.getenv("COMPUTE_TYPE", "int8")
 DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 CPU_THREADS = int(os.getenv("CPU_THREADS", "2"))
+API_KEY = os.getenv("API_KEY", "")
+
 FINAL_BEAM = int(os.getenv("FINAL_BEAM", "5"))
 FINAL_BEST_OF = int(os.getenv("FINAL_BEST_OF", "1"))
 FINAL_PATIENCE = float(os.getenv("FINAL_PATIENCE", "2.5"))
@@ -48,6 +50,14 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         init_data = await websocket.receive_json()
         if init_data.get("type") == "start":
+            # Перевірка API ключа, якщо він налаштований на сервері
+            client_key = init_data.get("api_key", "")
+            if API_KEY and client_key != API_KEY:
+                logger.warning(f"Unauthorized access attempt with key: {client_key}")
+                await websocket.send_json({"type": "error", "message": "Unauthorized"})
+                await websocket.close(code=1008)
+                return
+
             language = init_data.get("language", "uk")
             
         while True:
