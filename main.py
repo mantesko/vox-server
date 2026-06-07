@@ -92,6 +92,11 @@ async def websocket_endpoint(websocket: WebSocket):
                             no_speech_threshold=FINAL_NO_SPEECH_THRESHOLD,
                             chunk_length=FINAL_CHUNK_LENGTH,
                             condition_on_previous_text=FINAL_CONDITION_ON_PREVIOUS_TEXT,
+                            vad_filter=True,
+                            vad_parameters=dict(
+                                threshold=0.5,
+                                min_silence_duration_ms=500
+                            ),
                         )
                         final_text = " ".join([s.text.strip() for s in segments if s.text.strip()])
                         logger.info(f"Sending final: {final_text}")
