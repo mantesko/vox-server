@@ -21,9 +21,12 @@ FINAL_PATIENCE = float(os.getenv("FINAL_PATIENCE", "2.5"))
 FINAL_TEMPERATURE = os.getenv("FINAL_TEMPERATURE", "0.0")
 FINAL_REPETITION_PENALTY = float(os.getenv("FINAL_REPETITION_PENALTY", "1.2"))
 FINAL_NO_REPEAT_NGRAM_SIZE = int(os.getenv("FINAL_NO_REPEAT_NGRAM_SIZE", "3"))
-FINAL_NO_SPEECH_THRESHOLD = float(os.getenv("FINAL_NO_SPEECH_THRESHOLD", "0.5"))
-FINAL_CHUNK_LENGTH = int(os.getenv("FINAL_CHUNK_LENGTH", "30"))
+FINAL_NO_SPEECH_THRESHOLD = float(os.getenv("FINAL_NO_SPEECH_THRESHOLD", "0.6"))
+FINAL_CHUNK_LENGTH = int(os.getenv("FINAL_CHUNK_LENGTH", "15"))
 FINAL_CONDITION_ON_PREVIOUS_TEXT = os.getenv("FINAL_CONDITION_ON_PREVIOUS_TEXT", "false").lower() == "true"
+VAD_THRESHOLD = float(os.getenv("VAD_THRESHOLD", "0.4"))
+VAD_MIN_SILENCE_MS = int(os.getenv("VAD_MIN_SILENCE_MS", "300"))
+INITIAL_PROMPT = os.getenv("INITIAL_PROMPT", "")
 
 app = FastAPI()
 model = WhisperModel(
@@ -92,10 +95,11 @@ async def websocket_endpoint(websocket: WebSocket):
                             no_speech_threshold=FINAL_NO_SPEECH_THRESHOLD,
                             chunk_length=FINAL_CHUNK_LENGTH,
                             condition_on_previous_text=FINAL_CONDITION_ON_PREVIOUS_TEXT,
+                            initial_prompt=INITIAL_PROMPT or None,
                             vad_filter=True,
                             vad_parameters=dict(
-                                threshold=0.5,
-                                min_silence_duration_ms=500
+                                threshold=VAD_THRESHOLD,
+                                min_silence_duration_ms=VAD_MIN_SILENCE_MS
                             ),
                         )
                         final_text = " ".join([s.text.strip() for s in segments if s.text.strip()])

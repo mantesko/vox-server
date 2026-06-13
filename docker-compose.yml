@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   vox-server:
     build:
@@ -13,15 +11,20 @@ services:
       - WHISPER_MODEL=Systran/faster-whisper-small
       - COMPUTE_TYPE=int8
       - WHISPER_DEVICE=cpu
-      - FINAL_BEAM=10
+      - FINAL_BEAM=5
       - FINAL_BEST_OF=1
-      - FINAL_PATIENCE=2.5
-      - FINAL_TEMPERATURE=0.0
+      - FINAL_PATIENCE=1.0
+      - FINAL_TEMPERATURE=0.0,0.2
       - FINAL_REPETITION_PENALTY=1.2
-      - FINAL_NO_SPEECH_THRESHOLD=0.5
-      - FINAL_CONDITION_ON_PREVIOUS_TEXT=true
+      - FINAL_NO_REPEAT_NGRAM_SIZE=3
+      - FINAL_NO_SPEECH_THRESHOLD=0.6
+      - FINAL_CHUNK_LENGTH=15
+      - FINAL_CONDITION_ON_PREVIOUS_TEXT=false
+      - VAD_THRESHOLD=0.4
+      - VAD_MIN_SILENCE_MS=300
+      - INITIAL_PROMPT=Привіт, як справи? Добре, дякую. Сьогодні гарний день.
       - API_KEY=${VOX_API_KEY:-}
-      - CPU_THREADS=4
+      - CPU_THREADS=3
     volumes:
       - ./models:/app/models
     deploy:
