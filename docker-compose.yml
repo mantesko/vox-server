@@ -5,12 +5,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      network: host
     container_name: vox-server
     restart: unless-stopped
     ports:
       - "8002:8002"
-    security_opt:
-      - apparmor:unconfined
     environment:
       - WHISPER_MODEL=Systran/faster-whisper-small
       - COMPUTE_TYPE=int8
