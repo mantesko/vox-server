@@ -62,6 +62,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 return
 
             language = init_data.get("language", "uk")
+            client_prompt = init_data.get("initial_prompt") or ""
             
         while True:
             message = await websocket.receive()
@@ -95,7 +96,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             no_speech_threshold=FINAL_NO_SPEECH_THRESHOLD,
                             chunk_length=FINAL_CHUNK_LENGTH,
                             condition_on_previous_text=FINAL_CONDITION_ON_PREVIOUS_TEXT,
-                            initial_prompt=INITIAL_PROMPT or None,
+                            initial_prompt=client_prompt or INITIAL_PROMPT or None,
                             vad_filter=True,
                             vad_parameters=dict(
                                 threshold=VAD_THRESHOLD,
