@@ -63,6 +63,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
             language = init_data.get("language", "uk")
             client_prompt = init_data.get("initial_prompt") or ""
+            logger.info(f"Client prompt: '{client_prompt[:80]}...' " if client_prompt else "Client prompt: (empty)")
             
         while True:
             message = await websocket.receive()
