@@ -11,20 +11,20 @@ services:
       - WHISPER_MODEL=Systran/faster-whisper-small
       - COMPUTE_TYPE=int8
       - WHISPER_DEVICE=cpu
-      - FINAL_BEAM=5
+      - FINAL_BEAM=3
       - FINAL_BEST_OF=1
       - FINAL_PATIENCE=1.0
       - FINAL_TEMPERATURE=0.0,0.2
       - FINAL_REPETITION_PENALTY=1.2
       - FINAL_NO_REPEAT_NGRAM_SIZE=3
       - FINAL_NO_SPEECH_THRESHOLD=0.6
-      - FINAL_CHUNK_LENGTH=15
+      - FINAL_CHUNK_LENGTH=10
       - FINAL_CONDITION_ON_PREVIOUS_TEXT=false
       - VAD_THRESHOLD=0.4
       - VAD_MIN_SILENCE_MS=300
       - INITIAL_PROMPT=Це розпізнавання мовлення українською мовою з англійськими технічними термінами. Привіт, як справи? Добре, дякую. Сьогодні гарний день для роботи. docker compose up -d, docker compose down, git pull origin main, git commit -m, git push, npm install, npm run build, pip install, systemctl restart, sudo apt update, make a pull request, checkout the branch, merge conflicts, resolve the issue, deploy to production, the server is running, the container is healthy, the build failed, the tests are passing, the pipeline is green, the pull request is approved, the code review is done, the feature is ready, the bug is fixed, the database is connected, the API endpoint returns 200, the WebSocket connection is established, the deployment was successful, the monitoring shows no errors, the logs look clean, the configuration file, the environment variable, the virtual machine, the Kubernetes cluster, the Docker container, the nginx reverse proxy, the SSL certificate, the CI/CD pipeline, the staging environment, the production server, the backup is completed, the migration ran successfully, the cache is cleared, the rate limiter is configured, the load balancer is healthy.
       - API_KEY=${VOX_API_KEY:-}
-      - CPU_THREADS=3
+      - CPU_THREADS=4
     volumes:
       - ./models:/app/models
     deploy:
