@@ -23,7 +23,6 @@ services:
       - VAD_THRESHOLD=0.4
       - VAD_MIN_SILENCE_MS=300
       - INITIAL_PROMPT=Привіт, як справи? Добре, дякую. Сьогодні гарний день.
-      - API_KEY=${VOX_API_KEY:-}
       - CPU_THREADS=3
     volumes:
       - ./models:/app/models
