@@ -5,6 +5,7 @@ import logging
 import numpy as np
 from fastapi import FastAPI, WebSocket
 from faster_whisper import WhisperModel
+from groq import Groq
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("VoxServer")
@@ -24,8 +25,10 @@ FINAL_NO_REPEAT_NGRAM_SIZE = int(os.getenv("FINAL_NO_REPEAT_NGRAM_SIZE", "3"))
 FINAL_NO_SPEECH_THRESHOLD = float(os.getenv("FINAL_NO_SPEECH_THRESHOLD", "0.6"))
 FINAL_CHUNK_LENGTH = int(os.getenv("FINAL_CHUNK_LENGTH", "15"))
 FINAL_CONDITION_ON_PREVIOUS_TEXT = os.getenv("FINAL_CONDITION_ON_PREVIOUS_TEXT", "false").lower() == "true"
-VAD_THRESHOLD = float(os.getenv("VAD_THRESHOLD", "0.4"))
+VAD_THRESHOLD = float(os.getenv("VAD_THRESHOLD", "0.35"))
 VAD_MIN_SILENCE_MS = int(os.getenv("VAD_MIN_SILENCE_MS", "300"))
+LOG_PROB_THRESHOLD = float(os.getenv("LOG_PROB_THRESHOLD", "-1.0"))
+COMPRESSION_RATIO_THRESHOLD = float(os.getenv("COMPRESSION_RATIO_THRESHOLD", "2.4"))
 INITIAL_PROMPT = os.getenv("INITIAL_PROMPT", "")
 
 app = FastAPI()
@@ -39,9 +42,32 @@ logger.info(
     f"Loaded Whisper model {MODEL_NAME} on {DEVICE} with compute_type={COMPUTE_TYPE}, cpu_threads={CPU_THREADS}, beam={FINAL_BEAM}, best_of={FINAL_BEST_OF}"
 )
 
-
 def pcm_to_numpy(audio_bytes: bytes) -> np.ndarray:
     return np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+
+
+async def post_process_text(raw_text: str, groq_api_key: str = None, groq_prompt: str = None,
+                            groq_model: str = None, groq_temperature: float = None) -> str:
+    if not raw_text.strip() or not groq_api_key:
+        return raw_text
+
+    try:
+        client = Groq(api_key=groq_api_key)
+        completion = await asyncio.to_thread(
+            client.chat.completions.create,
+            model=groq_model or "llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": groq_prompt},
+                {"role": "user", "content": raw_text},
+            ],
+            temperature=groq_temperature if groq_temperature is not None else 0.2,
+        )
+        result = completion.choices[0].message.content.strip()
+        logger.info(f"Groq post-processing: {len(raw_text)} -> {len(result)} chars")
+        return result
+    except Exception as e:
+        logger.warning(f"Groq post-processing failed, returning raw text: {e}")
+        return raw_text
 
 @app.websocket("/stream")
 async def websocket_endpoint(websocket: WebSocket):
@@ -63,7 +89,15 @@ async def websocket_endpoint(websocket: WebSocket):
 
             language = init_data.get("language", "uk")
             client_prompt = init_data.get("initial_prompt") or ""
+            client_groq_key = init_data.get("groq_api_key") or ""
+            client_groq_prompt = init_data.get("groq_prompt") or ""
+            client_groq_model = init_data.get("groq_model") or ""
+            client_groq_temperature = init_data.get("groq_temperature")
+            if client_groq_temperature is not None:
+                client_groq_temperature = float(client_groq_temperature)
             logger.info(f"Client prompt: '{client_prompt[:80]}...' " if client_prompt else "Client prompt: (empty)")
+            if client_groq_key:
+                logger.info("Client Groq key received")
             
         while True:
             message = await websocket.receive()
@@ -103,8 +137,13 @@ async def websocket_endpoint(websocket: WebSocket):
                                 threshold=VAD_THRESHOLD,
                                 min_silence_duration_ms=VAD_MIN_SILENCE_MS
                             ),
+                            log_prob_threshold=LOG_PROB_THRESHOLD,
+                            compression_ratio_threshold=COMPRESSION_RATIO_THRESHOLD,
                         )
                         final_text = " ".join([s.text.strip() for s in segments if s.text.strip()])
+                        logger.info(f"Whisper raw: {final_text}")
+                        final_text = await post_process_text(final_text, client_groq_key, client_groq_prompt,
+                                                             client_groq_model, client_groq_temperature)
                         logger.info(f"Sending final: {final_text}")
                         await websocket.send_json({"type": "final", "text": final_text})
                     except Exception as e:
