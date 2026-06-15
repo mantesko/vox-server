@@ -6,6 +6,7 @@ import numpy as np
 from fastapi import FastAPI, WebSocket
 from faster_whisper import WhisperModel
 from groq import Groq
+import google.generativeai as genai
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("VoxServer")
@@ -46,28 +47,51 @@ def pcm_to_numpy(audio_bytes: bytes) -> np.ndarray:
     return np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
 
 
-async def post_process_text(raw_text: str, groq_api_key: str = None, groq_prompt: str = None,
-                            groq_model: str = None, groq_temperature: float = None) -> str:
-    if not raw_text.strip() or not groq_api_key:
+async def post_process_text(raw_text: str, provider: str = None, api_key: str = None,
+                            prompt: str = None, model: str = None, temperature: float = None) -> str:
+    if not raw_text.strip() or not api_key or not provider:
         return raw_text
 
     try:
-        client = Groq(api_key=groq_api_key)
-        completion = await asyncio.to_thread(
-            client.chat.completions.create,
-            model=groq_model or "llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": groq_prompt},
-                {"role": "user", "content": raw_text},
-            ],
-            temperature=groq_temperature if groq_temperature is not None else 0.2,
-        )
-        result = completion.choices[0].message.content.strip()
-        logger.info(f"Groq post-processing: {len(raw_text)} -> {len(result)} chars")
+        if provider == "gemini":
+            result = await _post_process_gemini(raw_text, api_key, prompt, model, temperature)
+        else:
+            result = await _post_process_groq(raw_text, api_key, prompt, model, temperature)
+        logger.info(f"{provider} post-processing: {len(raw_text)} -> {len(result)} chars")
         return result
     except Exception as e:
-        logger.warning(f"Groq post-processing failed, returning raw text: {e}")
+        logger.warning(f"{provider} post-processing failed, returning raw text: {e}")
         return raw_text
+
+
+async def _post_process_groq(raw_text: str, api_key: str, prompt: str, model: str, temperature: float) -> str:
+    client = Groq(api_key=api_key)
+    completion = await asyncio.to_thread(
+        client.chat.completions.create,
+        model=model or "llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": raw_text},
+        ],
+        temperature=temperature if temperature is not None else 0.2,
+    )
+    return completion.choices[0].message.content.strip()
+
+
+async def _post_process_gemini(raw_text: str, api_key: str, prompt: str, model: str, temperature: float) -> str:
+    genai.configure(api_key=api_key)
+    gemini_model = genai.GenerativeModel(model or "gemini-2.0-flash")
+    response = await asyncio.to_thread(
+        gemini_model.generate_content,
+        [
+            {"role": "user", "content": prompt},
+            {"role": "user", "content": raw_text},
+        ],
+        generation_config=genai.types.GenerationConfig(
+            temperature=temperature if temperature is not None else 0.2,
+        ),
+    )
+    return response.text.strip()
 
 @app.websocket("/stream")
 async def websocket_endpoint(websocket: WebSocket):
@@ -89,15 +113,16 @@ async def websocket_endpoint(websocket: WebSocket):
 
             language = init_data.get("language", "uk")
             client_prompt = init_data.get("initial_prompt") or ""
-            client_groq_key = init_data.get("groq_api_key") or ""
-            client_groq_prompt = init_data.get("groq_prompt") or ""
-            client_groq_model = init_data.get("groq_model") or ""
-            client_groq_temperature = init_data.get("groq_temperature")
-            if client_groq_temperature is not None:
-                client_groq_temperature = float(client_groq_temperature)
+            client_provider = init_data.get("post_process_provider") or ""
+            client_api_key = init_data.get("post_process_api_key") or ""
+            client_pp_prompt = init_data.get("post_process_prompt") or ""
+            client_pp_model = init_data.get("post_process_model") or ""
+            client_pp_temperature = init_data.get("post_process_temperature")
+            if client_pp_temperature is not None:
+                client_pp_temperature = float(client_pp_temperature)
             logger.info(f"Client prompt: '{client_prompt[:80]}...' " if client_prompt else "Client prompt: (empty)")
-            if client_groq_key:
-                logger.info("Client Groq key received")
+            if client_provider:
+                logger.info(f"Post-process provider: {client_provider}")
             
         while True:
             message = await websocket.receive()
@@ -142,8 +167,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         )
                         final_text = " ".join([s.text.strip() for s in segments if s.text.strip()])
                         logger.info(f"Whisper raw: {final_text}")
-                        final_text = await post_process_text(final_text, client_groq_key, client_groq_prompt,
-                                                             client_groq_model, client_groq_temperature)
+                        final_text = await post_process_text(final_text, client_provider, client_api_key,
+                                                             client_pp_prompt, client_pp_model, client_pp_temperature)
                         logger.info(f"Sending final: {final_text}")
                         await websocket.send_json({"type": "final", "text": final_text})
                     except Exception as e:
